@@ -883,6 +883,8 @@ imageToCrop toRect:(CGRect)rect {
     
    // UIImage* matImage1 = [ImageUtility UIImageFromCVMat:matImage];
     
+    //TODO: change param1 and 2 to find less circles
+    
     viewImage1 = [CoinDetect coinDetect:shotScaled dp:1 minDist:10 param1:120 param2:20 min_radius:0 max_radius:0 touchX:touchPoint.x touchY:touchPoint.y shotHeight:shotH shotWidth:shotW blank:blankScaled screenHeight:screenH screenWidth:screenW coinType:coin];
     
     
