@@ -29,10 +29,6 @@ typedef NS_ENUM( NSInteger, AVCamSetupResult ) {
 // For use in the storyboards.
 @property (nonatomic, weak) IBOutlet AAPLPreviewView *previewView;
 @property (nonatomic, weak) IBOutlet UILabel *cameraUnavailableLabel;
-@property (nonatomic, weak) IBOutlet UIButton *resumeButton;
-@property (nonatomic, weak) IBOutlet UIButton *recordButton;
-@property (nonatomic, weak) IBOutlet UIButton *cameraButton;
-@property (nonatomic, weak) IBOutlet UIButton *stillButton;
 
 // Session management.
 @property (nonatomic) dispatch_queue_t sessionQueue;
@@ -65,15 +61,19 @@ CGSize screenSz;
 AppDelegate *appDelegate1;
 int coin;
 
+
+
 - (void)viewDidLoad
 {
 //    [self.navigationController setNavigationBarHidden:YES animated:YES];
     [super viewDidLoad];
-    
+
+// gets coin type from appdelegate
     appDelegate1 = (AppDelegate *)[[UIApplication sharedApplication] delegate];
 
     coin = [appDelegate1.coinType intValue];
-   
+
+//gets size of screen
     screenWidth = [UIScreen mainScreen].bounds.size.width;
     screenHeight = [UIScreen mainScreen].bounds.size.height;
     //- self.navigationController.navigationBar.frame.size.height;
@@ -88,9 +88,6 @@ int coin;
 //    [self imageByCropping:blank toRect:screen];
     
     // Disable UI. The UI is enabled if and only if the session starts running.
-    self.cameraButton.enabled = NO;
-    self.recordButton.enabled = NO;
-    self.stillButton.enabled = NO;
     
     // Create the AVCaptureSession.
     self.session = [[AVCaptureSession alloc] init];
@@ -399,69 +396,18 @@ int coin;
             }
             else {
                 dispatch_async( dispatch_get_main_queue(), ^{
-                    self.resumeButton.hidden = NO;
                 } );
             }
         } );
     }
     else {
-        self.resumeButton.hidden = NO;
     }
 }
-
-//- (void)sessionWasInterrupted:(NSNotification *)notification
-//{
-//	// In some scenarios we want to enable the user to resume the session running.
-//	// For example, if music playback is initiated via control center while using AVCam,
-//	// then the user can let AVCam resume the session running, which will stop music playback.
-//	// Note that stopping music playback in control center will not automatically resume the session running.
-//	// Also note that it is not always possible to resume, see -[resumeInterruptedSession:].
-//	BOOL showResumeButton = NO;
-//
-//	// In iOS 9 and later, the userInfo dictionary contains information on why the session was interrupted.
-//	if ( &AVCaptureSessionInterruptionReasonKey ) {
-//		AVCaptureSessionInterruptionReason reason = [notification.userInfo[AVCaptureSessionInterruptionReasonKey] integerValue];
-//		NSLog( @"Capture session was interrupted with reason %ld", (long)reason );
-//
-//		if ( reason == AVCaptureSessionInterruptionReasonAudioDeviceInUseByAnotherClient ||
-//			 reason == AVCaptureSessionInterruptionReasonVideoDeviceInUseByAnotherClient ) {
-//			showResumeButton = YES;
-//		}
-//		else if ( reason == AVCaptureSessionInterruptionReasonVideoDeviceNotAvailableWithMultipleForegroundApps ) {
-//			// Simply fade-in a label to inform the user that the camera is unavailable.
-//			self.cameraUnavailableLabel.hidden = NO;
-//			self.cameraUnavailableLabel.alpha = 0.0;
-//			[UIView animateWithDuration:0.25 animations:^{
-//				self.cameraUnavailableLabel.alpha = 1.0;
-//			}];
-//		}
-//	}
-//	else {
-//		NSLog( @"Capture session was interrupted" );
-//		showResumeButton = ( [UIApplication sharedApplication].applicationState == UIApplicationStateInactive );
-//	}
-//
-//	if ( showResumeButton ) {
-//		// Simply fade-in a button to enable the user to try to resume the session running.
-//		self.resumeButton.hidden = NO;
-//		self.resumeButton.alpha = 0.0;
-//		[UIView animateWithDuration:0.25 animations:^{
-//			self.resumeButton.alpha = 1.0;
-//		}];
-//	}
-//}
 
 - (void)sessionInterruptionEnded:(NSNotification *)notification
 {
     NSLog( @"Capture session interruption ended" );
     
-    if ( ! self.resumeButton.hidden ) {
-        [UIView animateWithDuration:0.25 animations:^{
-            self.resumeButton.alpha = 0.0;
-        } completion:^( BOOL finished ) {
-            self.resumeButton.hidden = YES;
-        }];
-    }
     if ( ! self.cameraUnavailableLabel.hidden ) {
         [UIView animateWithDuration:0.25 animations:^{
             self.cameraUnavailableLabel.alpha = 0.0;
@@ -473,274 +419,8 @@ int coin;
 
 #pragma mark Actions
 
-- (IBAction)resumeInterruptedSession:(id)sender
-{
-    dispatch_async( self.sessionQueue, ^{
-        // The session might fail to start running, e.g., if a phone or FaceTime call is still using audio or video.
-        // A failure to start the session running will be communicated via a session runtime error notification.
-        // To avoid repeatedly failing to start the session running, we only try to restart the session running in the
-        // session runtime error handler if we aren't trying to resume the session running.
-        [self.session startRunning];
-        self.sessionRunning = self.session.isRunning;
-        if ( ! self.session.isRunning ) {
-            dispatch_async( dispatch_get_main_queue(), ^{
-                NSString *message = NSLocalizedString( @"Unable to resume", @"Alert message when unable to resume the session running" );
-                UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"AVCam" message:message preferredStyle:UIAlertControllerStyleAlert];
-                UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:NSLocalizedString( @"OK", @"Alert OK button" ) style:UIAlertActionStyleCancel handler:nil];
-                [alertController addAction:cancelAction];
-                [self presentViewController:alertController animated:YES completion:nil];
-            } );
-        }
-        else {
-            dispatch_async( dispatch_get_main_queue(), ^{
-                self.resumeButton.hidden = YES;
-            } );
-        }
-    } );
-}
-
-- (IBAction)toggleMovieRecording:(id)sender
-{
-    // Disable the Camera button until recording finishes, and disable the Record button until recording starts or finishes. See the
-    // AVCaptureFileOutputRecordingDelegate methods.
-    self.cameraButton.enabled = NO;
-    self.recordButton.enabled = NO;
-    
-    dispatch_async( self.sessionQueue, ^{
-        if ( ! self.movieFileOutput.isRecording ) {
-            if ( [UIDevice currentDevice].isMultitaskingSupported ) {
-                // Setup background task. This is needed because the -[captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:]
-                // callback is not received until AVCam returns to the foreground unless you request background execution time.
-                // This also ensures that there will be time to write the file to the photo library when AVCam is backgrounded.
-                // To conclude this background execution, -endBackgroundTask is called in
-                // -[captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:] after the recorded file has been saved.
-                self.backgroundRecordingID = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:nil];
-            }
-            
-            // Update the orientation on the movie file output video connection before starting recording.
-            AVCaptureConnection *connection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
-            AVCaptureVideoPreviewLayer *previewLayer = (AVCaptureVideoPreviewLayer *)self.previewView.layer;
-            connection.videoOrientation = previewLayer.connection.videoOrientation;
-            
-            
-            // Turn OFF flash for video recording.
-            [CamHeader setFlashMode:AVCaptureFlashModeOff forDevice:self.videoDeviceInput.device];
-            
-            // Start recording to a temporary file.
-            NSString *outputFileName = [NSProcessInfo processInfo].globallyUniqueString;
-            NSString *outputFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[outputFileName stringByAppendingPathExtension:@"mov"]];
-            [self.movieFileOutput startRecordingToOutputFileURL:[NSURL fileURLWithPath:outputFilePath] recordingDelegate:self];
-        }
-        else {
-            [self.movieFileOutput stopRecording];
-        }
-    } );
-}
-
-- (IBAction)changeCamera:(id)sender
-{
-    self.cameraButton.enabled = NO;
-    self.recordButton.enabled = NO;
-    self.stillButton.enabled = NO;
-    
-    dispatch_async( self.sessionQueue, ^{
-        AVCaptureDevice *currentVideoDevice = self.videoDeviceInput.device;
-        AVCaptureDevicePosition preferredPosition = AVCaptureDevicePositionUnspecified;
-        AVCaptureDevicePosition currentPosition = currentVideoDevice.position;
-        
-        switch ( currentPosition )
-        {
-            case AVCaptureDevicePositionUnspecified:
-            case AVCaptureDevicePositionFront:
-                preferredPosition = AVCaptureDevicePositionBack;
-                break;
-            case AVCaptureDevicePositionBack:
-                preferredPosition = AVCaptureDevicePositionFront;
-                break;
-        }
-        
-        AVCaptureDevice *videoDevice = [CamHeader deviceWithMediaType:AVMediaTypeVideo preferringPosition:preferredPosition];
-        AVCaptureDeviceInput *videoDeviceInput = [AVCaptureDeviceInput deviceInputWithDevice:videoDevice error:nil];
-        
-        [self.session beginConfiguration];
-        
-        // Remove the existing device input first, since using the front and back camera simultaneously is not supported.
-        [self.session removeInput:self.videoDeviceInput];
-        
-        if ( [self.session canAddInput:videoDeviceInput] ) {
-            [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceSubjectAreaDidChangeNotification object:currentVideoDevice];
-            
-            [CamHeader setFlashMode:AVCaptureFlashModeAuto forDevice:videoDevice];
-            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(subjectAreaDidChange:) name:AVCaptureDeviceSubjectAreaDidChangeNotification object:videoDevice];
-            
-            [self.session addInput:videoDeviceInput];
-            self.videoDeviceInput = videoDeviceInput;
-        }
-        else {
-            [self.session addInput:self.videoDeviceInput];
-        }
-        
-        AVCaptureConnection *connection = [self.movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
-        if ( connection.isVideoStabilizationSupported ) {
-            connection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
-        }
-        
-        [self.session commitConfiguration];
-        
-        dispatch_async( dispatch_get_main_queue(), ^{
-            self.cameraButton.enabled = YES;
-            self.recordButton.enabled = YES;
-            self.stillButton.enabled = YES;
-        } );
-    } );
-}
-
-//- (IBAction)snapStillImage:(id)sender
-//{
-//	dispatch_async( self.sessionQueue, ^{
-//		AVCaptureConnection *connection = [self.stillImageOutput connectionWithMediaType:AVMediaTypeVideo];
-//		AVCaptureVideoPreviewLayer *previewLayer = (AVCaptureVideoPreviewLayer *)self.previewView.layer;
-//
-//		// Update the orientation on the still image output video connection before capturing.
-//		connection.videoOrientation = previewLayer.connection.videoOrientation;
-//
-//		// Flash set to Auto for Still Capture.
-//		[AAPLCameraViewController setFlashMode:AVCaptureFlashModeAuto forDevice:self.videoDeviceInput.device];
-//
-//		// Capture a still image.
-//		[self.stillImageOutput captureStillImageAsynchronouslyFromConnection:connection completionHandler:^( CMSampleBufferRef imageDataSampleBuffer, NSError *error ) {
-//			if ( imageDataSampleBuffer ) {
-//				// The sample buffer is not retained. Create image data before saving the still image to the photo library asynchronously.
-//				NSData *imageData = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-//				[PHPhotoLibrary requestAuthorization:^( PHAuthorizationStatus status ) {
-//					if ( status == PHAuthorizationStatusAuthorized ) {
-//						// To preserve the metadata, we create an asset from the JPEG NSData representation.
-//						// Note that creating an asset from a UIImage discards the metadata.
-//						// In iOS 9, we can use -[PHAssetCreationRequest addResourceWithType:data:options].
-//						// In iOS 8, we save the image to a temporary file and use +[PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:].
-//						if ( [PHAssetCreationRequest class] ) {
-//							[[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-//								[[PHAssetCreationRequest creationRequestForAsset] addResourceWithType:PHAssetResourceTypePhoto data:imageData options:nil];
-//							} completionHandler:^( BOOL success, NSError *error ) {
-//								if ( ! success ) {
-//									NSLog( @"Error occurred while saving image to photo library: %@", error );
-//								}
-//							}];
-//						}
-//						else {
-//							NSString *temporaryFileName = [NSProcessInfo processInfo].globallyUniqueString;
-//							NSString *temporaryFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[temporaryFileName stringByAppendingPathExtension:@"jpg"]];
-//							NSURL *temporaryFileURL = [NSURL fileURLWithPath:temporaryFilePath];
-//
-//							[[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-//								NSError *error = nil;
-//								[imageData writeToURL:temporaryFileURL options:NSDataWritingAtomic error:&error];
-//								if ( error ) {
-//									NSLog( @"Error occured while writing image data to a temporary file: %@", error );
-//								}
-//								else {
-//									[PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:temporaryFileURL];
-//								}
-//							} completionHandler:^( BOOL success, NSError *error ) {
-//								if ( ! success ) {
-//									NSLog( @"Error occurred while saving image to photo library: %@", error );
-//								}
-//
-//								// Delete the temporary file.
-//								[[NSFileManager defaultManager] removeItemAtURL:temporaryFileURL error:nil];
-//							}];
-//						}
-//					}
-//				}];
-//			}
-//			else {
-//				NSLog( @"Could not capture still image: %@", error );
-//			}
-//		}];
-//	} );
-//}
-
-- (IBAction)focusAndExposeTap:(UIGestureRecognizer *)gestureRecognizer
-{
-    CGPoint devicePoint = [(AVCaptureVideoPreviewLayer *)self.previewView.layer captureDevicePointOfInterestForPoint:[gestureRecognizer locationInView:gestureRecognizer.view]];
-    [self focusWithMode:AVCaptureFocusModeAutoFocus exposeWithMode:AVCaptureExposureModeAutoExpose atDevicePoint:devicePoint monitorSubjectAreaChange:YES];
-}
-
 #pragma mark File Output Recording Delegate
 
-- (void)captureOutput:(AVCaptureFileOutput *)captureOutput didStartRecordingToOutputFileAtURL:(NSURL *)fileURL fromConnections:(NSArray *)connections
-{
-    // Enable the Record button to let the user stop the recording.
-    dispatch_async( dispatch_get_main_queue(), ^{
-        self.recordButton.enabled = YES;
-        [self.recordButton setTitle:NSLocalizedString( @"Stop", @"Recording button stop title") forState:UIControlStateNormal];
-    });
-}
-
-//- (void)captureOutput:(AVCaptureFileOutput *)captureOutput didFinishRecordingToOutputFileAtURL:(NSURL *)outputFileURL fromConnections:(NSArray *)connections error:(NSError *)error
-//{
-//	// Note that currentBackgroundRecordingID is used to end the background task associated with this recording.
-//	// This allows a new recording to be started, associated with a new UIBackgroundTaskIdentifier, once the movie file output's isRecording property
-//	// is back to NO — which happens sometime after this method returns.
-//	// Note: Since we use a unique file path for each recording, a new recording will not overwrite a recording currently being saved.
-//	UIBackgroundTaskIdentifier currentBackgroundRecordingID = self.backgroundRecordingID;
-//	self.backgroundRecordingID = UIBackgroundTaskInvalid;
-//
-//	dispatch_block_t cleanup = ^{
-//		[[NSFileManager defaultManager] removeItemAtURL:outputFileURL error:nil];
-//		if ( currentBackgroundRecordingID != UIBackgroundTaskInvalid ) {
-//			[[UIApplication sharedApplication] endBackgroundTask:currentBackgroundRecordingID];
-//		}
-//	};
-//
-//	BOOL success = YES;
-//
-//	if ( error ) {
-//		NSLog( @"Movie file finishing error: %@", error );
-//		success = [error.userInfo[AVErrorRecordingSuccessfullyFinishedKey] boolValue];
-//	}
-//	if ( success ) {
-//		// Check authorization status.
-//		[PHPhotoLibrary requestAuthorization:^( PHAuthorizationStatus status ) {
-//			if ( status == PHAuthorizationStatusAuthorized ) {
-//				// Save the movie file to the photo library and cleanup.
-//				[[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-//					// In iOS 9 and later, it's possible to move the file into the photo library without duplicating the file data.
-//					// This avoids using double the disk space during save, which can make a difference on devices with limited free disk space.
-//					if ( [PHAssetResourceCreationOptions class] ) {
-//						PHAssetResourceCreationOptions *options = [[PHAssetResourceCreationOptions alloc] init];
-//						options.shouldMoveFile = YES;
-//						PHAssetCreationRequest *changeRequest = [PHAssetCreationRequest creationRequestForAsset];
-//						[changeRequest addResourceWithType:PHAssetResourceTypeVideo fileURL:outputFileURL options:options];
-//					}
-//					else {
-//						[PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:outputFileURL];
-//					}
-//				} completionHandler:^( BOOL success, NSError *error ) {
-//					if ( ! success ) {
-//						NSLog( @"Could not save movie to photo library: %@", error );
-//					}
-//					cleanup();
-//				}];
-//			}
-//			else {
-//				cleanup();
-//			}
-//		}];
-//	}
-//	else {
-//		cleanup();
-//	}
-//
-//	// Enable the Camera and Record buttons to let the user switch camera and start another recording.
-//	dispatch_async( dispatch_get_main_queue(), ^{
-//		// Only enable the ability to change camera if the device has more than one camera.
-//		self.cameraButton.enabled = ( [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo].count > 1 );
-//		self.recordButton.enabled = YES;
-//		[self.recordButton setTitle:NSLocalizedString( @"Record", @"Recording button record title" ) forState:UIControlStateNormal];
-//	});
-//}
-//
 #pragma mark Device Configuration
 
 - (void)focusWithMode:(AVCaptureFocusMode)focusMode exposeWithMode:(AVCaptureExposureMode)exposureMode atDevicePoint:(CGPoint)point monitorSubjectAreaChange:(BOOL)monitorSubjectAreaChange
@@ -856,6 +536,7 @@ imageToCrop toRect:(CGRect)rect {
     return cropped;
 }
 
+//process the image then pass it into the coinDetect function in CoinDetect class
 - (void)screenShotPasser:(UIImage *)shot{
     
     
@@ -869,28 +550,11 @@ imageToCrop toRect:(CGRect)rect {
     UIImage* shotScaled = [self scaleImageToSize:screenSz imageTo:shot];
     UIImage* blankScaled = [self scaleBlankImageToSize:screenSz imageTo:blank];
     
-    //NSSet *touches1 = [event touchesForView:sender];
     
-    //    UIGraphicsBeginImageContext(_previewView.frame.size);
-    //    [_previewView.layer renderInContext:UIGraphicsGetCurrentContext()];
-    //    UIImage *viewImage = UIGraphicsGetImageFromCurrentImageContext();
-    //    UIGraphicsEndImageContext();
-    
-    //UIImage* screenShot2 = [self imageByCropping:screenShot toRect:blankRect];;
+    viewImage1 = [CoinDetect coinDetect:shotScaled dp:1 minDist:10 param1:200 param2:20 min_radius:0 max_radius:0 touchX:touchPoint.x touchY:touchPoint.y shotHeight:shotH shotWidth:shotW blank:blankScaled screenHeight:screenH screenWidth:screenW coinType:coin];
     
     
-    //matImage = [ImageUtility cvMatFromUIImage:shotScaled];
-    
-   // UIImage* matImage1 = [ImageUtility UIImageFromCVMat:matImage];
-    
-    //TODO: change param1 and 2 to find less circles
-    
-    viewImage1 = [CoinDetect coinDetect:shotScaled dp:1 minDist:10 param1:120 param2:20 min_radius:0 max_radius:0 touchX:touchPoint.x touchY:touchPoint.y shotHeight:shotH shotWidth:shotW blank:blankScaled screenHeight:screenH screenWidth:screenW coinType:coin];
-    
-    
-    //[_img.layer setContents:(id)[screenShot CGImage]];
-    
-    //viewImage1 = [UIImage imageWithCGImage:viewImage1.CGImage scale:1.0 orientation:UIImageOrientationRight];
+//overlay the processed transparent image with rulers now drawn on
     _img.image = viewImage1;
     //_img.clipsToBounds = YES;
     

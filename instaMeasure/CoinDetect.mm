@@ -11,7 +11,6 @@
 #import "ImageUtility.h"
 #import <opencv2/core/core_c.h>
 #import <opencv2/highgui/ios.h>
-//#import <opencv2/stitching/stitcher.hpp>
 #import <math.h>
 #import "AppDelegate.h"
 
@@ -41,40 +40,25 @@ AppDelegate *appDelegateCD;
 {
     
     UIImage* result = nil;
-//    cv::Mat matImage = [ImageUtility cvMatFromUIImage:image];
+//  convert the photo the camera took to MAT
     cv::Mat matImage;
     UIImageToMat(image, matImage);
 
     cv::Mat blankImage =  [ImageUtility cvMatFromUIImage:blank];
-//    cv::Mat blankImage;
-//    UIImageToMat(blank, blankImage, true);
     cv::Mat grayImage;
-//    cv::cvtColor(blankImage, blankImage, cv::COLOR_BGR2RGBA);
+//  blank is in wrong orientation, this fixes it
     transpose(blankImage, blankImage);
     flip(blankImage, blankImage,1); //transpose+flip(1)=CW
     
+//convert the Mat to gray scale because Hough Circles alg needs grayscale image
     cv::cvtColor(matImage, grayImage, cv::COLOR_BGR2GRAY);
     
-    //grayImage2 = [ImageUtility cvMatFromUIImage:grayImage];
     
-    /// Reduce the noise so we avoid false circle detection
+// Reduce the noise so we avoid false circle detection
     
     cv::GaussianBlur(grayImage, grayImage, cv::Size(9,9), 2, 2);
-//    
-//    int rows = image.size.height;
-//    int cols = image.size.width;
-//    int brows = blank.size.width;
-//    int bcols = blank.size.height;
-//    
-//    
-//    float pointHeight = screenHeight/touchY;
-//    float pointWidth = screenWidth/touchX;
-//    
-//    float newTouchY = touchY/pointHeight;
-//    float newTouchX = touchX;
-//    float newTouchX = cols/pointHeight;
-//    float newTouchY = rows/pointWidth;
-//    
+    
+
     cv::vector<cv::Vec3f> circles;
     
     
@@ -114,6 +98,7 @@ AppDelegate *appDelegateCD;
     
     for( int i = 0; i < circles.size(); i++ )
     {
+        
         cv::Vec3i c = circles[i];
         float distance;
         float dx, dy;
@@ -121,22 +106,47 @@ AppDelegate *appDelegateCD;
         dx = touchX - c[0] ;
         dy =  touchY - c[1]  ;
         
+ // find distance between touch and center of circle
+        
         distance = sqrt(dx*dx + dy*dy);
+        
+// if the distance is less than or equal to the radius, then the touch is within the circle
         
         if(distance <= c[2]){
             float inch;
+            
+//diameter of the coin in points on the photo
+            
             float diamf = c[2] * 2;
+            
+//converting it to int then back to float
+//cuts off the trailing decimal at hundredths place for easier computation
+            
             int diami = diamf *100;
             float diam = diami/100;
             
             touchedCircles[j] = i;
             j++;
             
+//cointype 0 is penny, sent from second view into appdelegate,
+//retrieved from appdelegate
+            
             
             if(coinType ==0){
-      
+                
+//a penny is .75 of an inch, so dividing the diameter
+//by 3 will give us the amount in points needed to
+//add to it to get the size of an inch in points relative to the penny
+                
                 float coin = diam/3;
                 inch = coin + diam;
+                
+//thickness of a penny is .0598 of an inch,
+//so we must get that in hundredths of inches on the photo
+//so we get a hundredth of an inch then multiply that by the thickness
+//then chop off the trailing decimal by multiplying and converting to an int
+//then back to float and dividing
+                
                 float thickness = inch/100;
                 float thickness1 = thickness *.0598;
                 int thickness2 = thickness1 * 100;
@@ -308,7 +318,8 @@ AppDelegate *appDelegateCD;
             
             cv::circle(blankImage , cv::Point(c[0], c[1]), c[2], cvScalar(0,0,255), 3, CV_AA);
             
-            //circle( cimg, Point(c[0], c[1]), 2, Scalar(0,255,0), 3, CV_AA);
+            //circle( cimg, Poi nt(c[0], c[1]), 2, Scalar(0,255,0), 3, CV_AA);
+            break;
             
         }
     }

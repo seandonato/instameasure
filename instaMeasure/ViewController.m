@@ -38,6 +38,8 @@ NSNumber *coin1;
     
  //   NSNumber *coin = appDelegate.coinType;
 }
+//choose what type of coin you want to use and send it to appdelegate (singleton)
+//for use in other classes
 - (IBAction)penny:(id)sender {
     
         //UIButton *button=(UIButton*)sender;
@@ -68,7 +70,7 @@ NSNumber *coin1;
         
     }
 
-
+//about button
 - (IBAction)about:(id)sender{
 
     if(_text.hidden == YES){
@@ -81,6 +83,7 @@ NSNumber *coin1;
     }
 }
 
+//instructions
 - (IBAction)instructions:(id)sender{
     
     if(_instruct.hidden == YES){
